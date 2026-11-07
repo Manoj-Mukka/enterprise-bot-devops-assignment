@@ -1,0 +1,5 @@
+Wait for the deployment:
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "demo-service.fullname" . }}
+
+Test through ingress-nginx without editing DNS:
+  curl --resolve {{ .Values.ingress.host }}:80:127.0.0.1 http://{{ .Values.ingress.host }}/
