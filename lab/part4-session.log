@@ -1,0 +1,183 @@
+Script started on 2026-11-12 14:18:24+00:00 [COMMAND="bash lab/.record-validation.sh" <not executed on terminal>]
++ REPO_ROOT=/mnt/c/Users/Admin/Desktop/enterprise-bot-learning-attempt
++ cd /mnt/c/Users/Admin/Desktop/enterprise-bot-learning-attempt
++ date -Is
+2026-11-12T14:18:24+00:00
++ docker version --format 'Docker client {{.Client.Version}} / server {{.Server.Version}}'
+Docker client 29.9.2 / server 29.9.2
++ kind version
+kind v0.33.0 go1.26.7 windows/amd64
++ kubectl version --client
+Client Version: v1.37.1
+Kustomize Version: v5.8.1
++ helm version --short
+v4.1.4+g05fa379
++ cd /mnt/c/Users/Admin/Desktop/enterprise-bot-learning-attempt/service
++ ./.venv/Scripts/python.exe -m unittest -v
+test_healthz (test_app.ServiceTestCase.test_healthz) ... ok
+test_projected_file_reflects_configmap_updates (test_app.ServiceTestCase.test_projected_file_reflects_configmap_updates) ... ok
+test_root_uses_environment (test_app.ServiceTestCase.test_root_uses_environment) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.092s
+
+OK
++ cd /mnt/c/Users/Admin/Desktop/enterprise-bot-learning-attempt
++ helm lint ./chart
+==> Linting ./chart
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
++ helm template demo ./chart --set replicaCount=3 --set config.appName=validation-demo --set config.version=9.9.9
++ grep -E 'replicas: 3|APP_NAME:|VERSION:' /tmp/demo-rendered.yaml
++ head -n 10
+  APP_NAME: "validation-demo"
+  VERSION: "9.9.9"
+  replicas: 3
++ helm lint ./lab/broken-chart
+==> Linting ./lab/broken-chart
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
++ cd /mnt/c/Users/Admin/Desktop/enterprise-bot-learning-attempt/lab
++ kubectl get nodes
+NAME                 STATUS   ROLES           AGE    VERSION
+demo-control-plane   Ready    control-plane   5d4h   v1.37.0
++ ./scenario.sh up
+==> applying cluster environment (cluster-state/)
+limitrange/debug-lab-guardrails unchanged
+namespace/debug-lab unchanged
+==> installing the broken chart
+Release "debug-lab" has been upgraded. Happy Helming!
+NAME: debug-lab
+LAST DEPLOYED: Thu Nov 12 19:48:28 2026
+NAMESPACE: debug-lab
+STATUS: deployed
+REVISION: 10
+DESCRIPTION: Upgrade complete
+TEST SUITE: None
+NOTES:
+debug-lab installed into namespace debug-lab.
+
+Goal state:
+  * migrate Job: Completed
+  * backend, gateway, worker, reporter, metrics: all pods Running and 1/1 Ready
+  * gateway /status reports {"self":"ok","backend":"ok",...}
+
+Check your progress at any time:
+  ./scenario.sh verify
+
+Lab is (partially) installed. Investigate with kubectl, fix the chart,
+re-run './scenario.sh up' to apply your fixes, and './scenario.sh verify'
+to check progress.
++ kubectl -n debug-lab rollout status deployment/backend --timeout=120s
+deployment "backend" successfully rolled out
++ kubectl -n debug-lab rollout status deployment/gateway --timeout=120s
+deployment "gateway" successfully rolled out
++ kubectl -n debug-lab rollout status deployment/worker --timeout=120s
+deployment "worker" successfully rolled out
++ kubectl -n debug-lab rollout status deployment/metrics --timeout=120s
+deployment "metrics" successfully rolled out
++ kubectl -n debug-lab wait --for=condition=Ready pod -l app=backend --timeout=180s
+pod/backend-64b799c9c4-qkmpt condition met
++ kubectl -n debug-lab wait --for=condition=Ready pod -l app=gateway --timeout=180s
+pod/gateway-69ccbcdc95-khpzl condition met
++ kubectl -n debug-lab wait --for=condition=Ready pod -l app=worker --timeout=180s
+pod/worker-89d8c47d7-g2rb9 condition met
++ kubectl -n debug-lab wait --for=condition=Ready pod -l app=metrics --timeout=180s
+pod/metrics-758cd6c755-q2wmf condition met
++ kubectl -n debug-lab get jobs
+NAME      STATUS     COMPLETIONS   DURATION   AGE
+migrate   Complete   1/1           6s         5d4h
++ kubectl -n debug-lab get deployments
+NAME       READY   UP-TO-DATE   AVAILABLE   AGE
+backend    1/1     1            1           5d4h
+gateway    1/1     1            1           5d4h
+metrics    1/1     1            1           5d4h
+reporter   0/1     1            0           5d4h
+worker     1/1     1            1           5d4h
++ kubectl -n debug-lab get pods -o wide
+NAME                        READY   STATUS      RESTARTS      AGE    IP            NODE                 NOMINATED NODE   READINESS GATES
+backend-64b799c9c4-qkmpt    1/1     Running     6 (35s ago)   5d4h   10.244.0.9    demo-control-plane   <none>           <none>
+gateway-69ccbcdc95-khpzl    1/1     Running     6 (35s ago)   5d4h   10.244.0.12   demo-control-plane   <none>           <none>
+metrics-758cd6c755-q2wmf    1/1     Running     6 (35s ago)   5d3h   10.244.0.13   demo-control-plane   <none>           <none>
+migrate-6ptwb               0/1     Completed   0             5d4h   <none>        demo-control-plane   <none>           <none>
+reporter-54677cbb78-4xngh   0/1     Running     6 (35s ago)   5d4h   10.244.0.7    demo-control-plane   <none>           <none>
+reporter-689754d5bb-585bt   0/1     Running     6 (35s ago)   5d4h   10.244.0.8    demo-control-plane   <none>           <none>
+worker-89d8c47d7-g2rb9      1/1     Running     6 (35s ago)   5d4h   10.244.0.10   demo-control-plane   <none>           <none>
++ ./scenario.sh verify
+==> verifying goal state in namespace debug-lab
+  [32mPASS[0m  migrate Job completed
+  [32mPASS[0m  deployment backend: 1/1 ready
+  [32mPASS[0m  deployment gateway: 1/1 ready
+  [32mPASS[0m  deployment worker: 1/1 ready
+  [31mFAIL[0m  deployment reporter: 0/1 ready
+  [32mPASS[0m  deployment metrics: 1/1 ready
+  [32mPASS[0m  no pods in CrashLoopBackOff
+  [32mPASS[0m  ServiceAccount debug-lab/reporter can list pods
+  [32mPASS[0m  backend answers on http://backend:8080/healthz
+  [32mPASS[0m  gateway /status reports backend=ok
+  [31mFAIL[0m  reporter /report does not return a pod count
+
+[31m2 check(s) failing[0m, 9 passing. Keep digging — every failure is a symptom.
++ true
++ kubectl auth can-i list pods -n debug-lab --as=system:serviceaccount:debug-lab:reporter
+yes
++ kubectl -n debug-lab logs -l app=reporter --prefix --tail=12
+[pod/reporter-54677cbb78-4xngh/reporter] 2026/11/12 14:18:29 eb-debug-app 2.0.0 starting: mode=reporter pod=reporter-54677cbb78-4xngh listening on :8081 (image default is 8081; set PORT to override)
+[pod/reporter-54677cbb78-4xngh/reporter] 2026/11/12 14:18:39 pod list failed: GET https://kubernetes.default.svc/api/v1/namespaces/debug-lab/pods?limit=100: Get "https://kubernetes.default.svc/api/v1/namespaces/debug-lab/pods?limit=100": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+[pod/reporter-54677cbb78-4xngh/reporter] 2026/11/12 14:18:39 GET /healthz -> 503 (from 10.244.0.1:42660)
+[pod/reporter-54677cbb78-4xngh/reporter] 2026/11/12 14:18:41 GET /healthz -> 503 (from 10.244.0.1:42672)
+[pod/reporter-54677cbb78-4xngh/reporter] 2026/11/12 14:18:49 pod list failed: GET https://kubernetes.default.svc/api/v1/namespaces/debug-lab/pods?limit=100: Get "https://kubernetes.default.svc/api/v1/namespaces/debug-lab/pods?limit=100": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+[pod/reporter-54677cbb78-4xngh/reporter] 2026/11/12 14:18:49 GET /healthz -> 503 (from 10.244.0.1:47854)
+[pod/reporter-54677cbb78-4xngh/reporter] 2026/11/12 14:18:51 GET /healthz -> 503 (from 10.244.0.1:47864)
+[pod/reporter-54677cbb78-4xngh/reporter] 2026/11/12 14:18:56 pod list failed: parse pod list: unexpected end of JSON input
+[pod/reporter-54677cbb78-4xngh/reporter] 2026/11/12 14:18:56 GET /healthz -> 503 (from 10.244.0.1:55570)
+[pod/reporter-54677cbb78-4xngh/reporter] 2026/11/12 14:19:01 GET /healthz -> 503 (from 10.244.0.1:55582)
+[pod/reporter-689754d5bb-585bt/reporter] 2026/11/12 14:18:29 eb-debug-app 2.0.0 starting: mode=reporter pod=reporter-689754d5bb-585bt listening on :8081 (image default is 8081; set PORT to override)
++ kubectl -n debug-lab get endpointslice -l kubernetes.io/service-name=reporter -o 'jsonpath={range .items[*].endpoints[*]}{.addresses}{" ready="}{.conditions.ready}{"\n"}{end}'
+["10.244.0.8"] ready=false
+["10.244.0.7"] ready=false
++ kubectl -n debug-lab run api-check --rm -i --restart=Never --image=curlimages/curl:8.10.1 '--overrides={"spec":{"serviceAccountName":"reporter"}}' -- sh -c '
+    SA_DIR=/var/run/secrets/kubernetes.io/serviceaccount
+    TOKEN=$(cat "$SA_DIR/token")
+    curl -fsS \
+      --cacert "$SA_DIR/ca.crt" \
+      -H "Authorization: Bearer $TOKEN" \
+      https://kubernetes.default.svc/api/v1/namespaces/debug-lab/pods \
+      -o /tmp/pods.json
+    wc -c < /tmp/pods.json
+    head -c 120 /tmp/pods.json
+    echo
+  '
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+119956
+{
+  "kind": "PodList",
+  "apiVersion": "v1",
+  "metadata": {
+    "resourceVersion": "189064"
+  },
+  "items": [
+    {
+   
+pod "api-check" deleted from debug-lab namespace
++ ./scenario.sh verify
+==> verifying goal state in namespace debug-lab
+  [32mPASS[0m  migrate Job completed
+  [32mPASS[0m  deployment backend: 1/1 ready
+  [32mPASS[0m  deployment gateway: 1/1 ready
+  [32mPASS[0m  deployment worker: 1/1 ready
+  [31mFAIL[0m  deployment reporter: 0/1 ready
+  [32mPASS[0m  deployment metrics: 1/1 ready
+  [32mPASS[0m  no pods in CrashLoopBackOff
+  [32mPASS[0m  ServiceAccount debug-lab/reporter can list pods
+  [32mPASS[0m  backend answers on http://backend:8080/healthz
+  [32mPASS[0m  gateway /status reports backend=ok
+  [31mFAIL[0m  reporter /report does not return a pod count
+
+[31m2 check(s) failing[0m, 9 passing. Keep digging — every failure is a symptom.
++ true
+
+Script done on 2026-11-12 14:19:11+00:00 [COMMAND_EXIT_CODE="0"]
